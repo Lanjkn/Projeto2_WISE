@@ -47,5 +47,4 @@ typing-extensions==4.3.0
 urllib3==1.26.10
 visions==0.7.4
 Werkzeug==1.0.1
-
 pymongo==4.2.0

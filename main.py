@@ -1,7 +1,7 @@
 import time
 import pandas as pd
 import numpy as np
-from flask import Flask, jsonify, request
+from fastapi import FastAPI, Request
 from scipy.stats import randint
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
@@ -18,7 +18,7 @@ np.random.seed(1010)
 
 MODELS = []
 MODELS_INFO = {}
-flask_app = Flask(__name__)
+app = FastAPI()
 
 mongo_client = MongoClient('localhost', 27017)
 
@@ -316,7 +316,7 @@ def classify_user(column, column_info, user_id_column):
         prediction_dataframe['PREDICTIONS'] = predictions
         model_predictions[str(model_index) + " - " + model.__class__.__name__] = prediction_dataframe.to_dict('records')
         model_index += 1
-    return jsonify(model_predictions)
+    return model_predictions
 
 
 def classify_all(user_id_column, model_choice_index):
@@ -326,48 +326,48 @@ def classify_all(user_id_column, model_choice_index):
     prediction_dataframe = pd.DataFrame()
     prediction_dataframe['ID'] = user_ids
     prediction_dataframe['PREDICTIONS'] = predictions
-    return jsonify(prediction_dataframe.to_dict('records'))
+    return prediction_dataframe.to_dict('records')
 
 
-@flask_app.route('/')
-def home():
+@app.get('/')
+async def home():
     welcome_message = "Welcome to iml api!\nHere, you can a whole lot of stuff, that i will sometime later add" \
                       "\n the api is focused on Machine Learning and model creation!"
     return welcome_message
 
 
-@flask_app.route('/create_model/RFC')
-def api_create_model_RFC():
+@app.get('/create_model/RFC')
+async def api_create_model_RFC():
     model = randomForest_model()
     MODELS_INFO[str(len(MODELS)) + " - " + model['model'].__class__.__name__] = model['model_info']
     MODELS.append(model['model'])
     return model['model_info']
 
 
-@flask_app.route('/create_model/LRC')
-def api_create_model_LRC():
+@app.get('/create_model/LRC')
+async def api_create_model_LRC():
     model = logisticRegression_model()
     MODELS.append(model['model'])
     MODELS_INFO[str(len(MODELS)) + " - " + model['model'].__class__.__name__] = model['model_info']
     return model['model_info']
 
 
-@flask_app.route('/create_model/MLP')
-def api_create_model_MLP():
+@app.get('/create_model/MLP')
+async def api_create_model_MLP():
     model = multilayerPerceptron_model()
     MODELS.append(model['model'])
     MODELS_INFO[str(len(MODELS)) + " - " + model['model'].__class__.__name__] = model['model_info']
     return model['model_info']
 
 
-@flask_app.route('/model_visualization/')
-def api_model_visualization():
-    return jsonify(MODELS_INFO)
+@app.get('/model_visualization/')
+async def api_model_visualization():
+    return MODELS_INFO
 
 
-@flask_app.route('/set_data/', methods=["POST"])
-def api_set_data():
-    file_loc_json = request.get_json()
+@app.post('/set_data/')
+async def api_set_data(json:Request):
+    file_loc_json = await json.json()
     data_dummified = pd.read_csv(file_loc_json['file_loc'])
     x = data_dummified.drop(labels=[file_loc_json['y']], axis=1)
     y = data_dummified[file_loc_json['y']]
@@ -375,40 +375,40 @@ def api_set_data():
     return 'new data was set!'
 
 
-@flask_app.route('/model_score/')
-def api_model_scores():
-    return jsonify(model_scores())
+@app.get('/model_score/')
+async def api_model_scores():
+    return model_scores()
 
 
-@flask_app.route('/create_model/hyper_parameters/RFC')
-def api_create_model_hp_RFC():
+@app.get('/create_model/hyper_parameters/RFC')
+async def api_create_model_hp_RFC():
     return hyper_parameters_random_forest()['model_info']
 
 
-@flask_app.route('/create_model/hyper_parameters/LRC')
-def api_create_model_hp_LRC():
+@app.get('/create_model/hyper_parameters/LRC')
+async def api_create_model_hp_LRC():
     return hyper_parameters_logistic_regression()['model_info']
 
 
-@flask_app.route('/create_model/hyper_parameters/MLP')
-def api_create_model_hp_MLP():
+@app.get('/create_model/hyper_parameters/MLP')
+async def api_create_model_hp_MLP():
     return hyper_parameters_multilayer_perceptron()['model_info']
 
 
-@flask_app.route('/cross_validation/', methods=["POST"])
-def api_cross_validation():
-    cv_options = request.get_json()
+@app.post('/cross_validation/')
+async def api_cross_validation(json:Request):
+    cv_options = await json.json()
     return cross_validation(cv_options)
 
 
-@flask_app.route('/clustering/', methods=["POST"])
-def api_clustering():
-    n_clusters = request.get_json()
+@app.post('/clustering/')
+async def api_clustering(json:Request):
+    n_clusters = await json.json()
     return clustering(n_clusters)
 
 
-@flask_app.route('/predictions/')
-def api_prediction():
+@app.get('/predictions/')
+async def api_prediction():
     try:
         prediction = MODELS[0].predict([[data_dummified[data].mean() for data in x.columns]])
         return str(prediction[0])
@@ -416,9 +416,9 @@ def api_prediction():
         return f'Index out of range! you have {len(MODELS)} models created!'
 
 
-@flask_app.route('/save_sanitized_dataset_mongo/', methods=['POST'])
-def api_sanitized_dataset_saving():
-    request_json = request.get_json()
+@app.post('/save_sanitized_dataset_mongo/')
+async def api_sanitized_dataset_saving(json:Request):
+    request_json = await json.json()
     data_to_dict = data_sanitized.to_dict('records')
     if list(db[request_json['collection_name']].find({})):
         return 'A collection with this name already exists, please, choose another. (or use ' \
@@ -427,9 +427,9 @@ def api_sanitized_dataset_saving():
     return f'Data was saved into Mongodb with the name {request_json["collection_name"]}.'
 
 
-@flask_app.route('/save_sanitized_dataset_mongo/force', methods=['POST'])
-def api_sanitized_dataset_saving_force():
-    request_json = request.get_json()
+@app.post('/save_sanitized_dataset_mongo/force')
+async def api_sanitized_dataset_saving_force(json:Request):
+    request_json = await json.json()
     data_to_dict = data_sanitized.to_dict('records')
     if list(db[request_json['collection_name']].find({})):
         data_set_dropped = True
@@ -444,9 +444,9 @@ def api_sanitized_dataset_saving_force():
     return f'Data was saved into Mongodb with the name {request_json["collection_name"]}.'
 
 
-@flask_app.route('/save_dataset_mongo/force', methods=['POST'])
-def api_dataset_saving_force():
-    request_json = request.get_json()
+@app.post('/save_dataset_mongo/force')
+async def api_dataset_saving_force(json:Request):
+    request_json = await json.json()
     data_to_dict = data.to_dict('records')
     if list(db[request_json['collection_name']].find({})):
         data_set_dropped = True
@@ -461,9 +461,9 @@ def api_dataset_saving_force():
     return f'Data was saved into Mongodb with the name {request_json["collection_name"]}.'
 
 
-@flask_app.route('/save_dataset_mongo/', methods=['POST'])
-def api_dataset_saving():
-    request_json = request.get_json()
+@app.post('/save_dataset_mongo/')
+async def api_dataset_saving(json:Request):
+    request_json = await json.json()
     data_to_dict = data_sanitized.to_dict('records')
     if list(db[request_json['collection_name']].find({})):
         return 'A collection with this name already exists, please, choose another. (or use ' \
@@ -471,24 +471,24 @@ def api_dataset_saving():
     db[request_json['collection_name']].insert_many(data_to_dict)
     return f'Data was saved into Mongodb with the name {request_json["collection_name"]}.'
 
-@flask_app.route('/prediction/column_equals')
-def api_prediction_columns_equals():
-    request_json = request.get_json()
+@app.post('/prediction/column_equals')
+async def api_prediction_columns_equals(json:Request):
+    request_json = await json.json()
     column = request_json['column']
     column_value = request_json['column_value']
     user_id_column = request_json['user_id_column']
     return classify_user(column, column_value, user_id_column)
 
-@flask_app.route('/prediction/all')
-def api_predict_all():
-    request_json = request.get_json()
+@app.post('/prediction/all')
+async def api_predict_all(json:Request):
+    request_json = await json.json()
     model_choice_index = request_json['model_choice_index']
     user_id_column = request_json['user_id_column']
     return classify_all(user_id_column, model_choice_index)
 
 
-db = mongo_client.projeto_wise
-clientes_collection = db.CLIENTES
+db = mongo_client.projeto_trainee
+clientes_collection = db.clientes
 
 data = pd.DataFrame(list(clientes_collection.find({})))
 data = remove_NANs_and_outliers(data)
@@ -496,6 +496,3 @@ data = remove_NANs_and_outliers(data)
 data_dummified, x, y, data_sanitized = data_setting(data)
 train_x, test_x, train_y, test_y = standardize_data_and_split(x, y)
 
-
-if __name__ == '__main__':
-    flask_app.run(debug=True)
