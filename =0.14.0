@@ -1,0 +1,5 @@
+Collecting uvloop
+  Downloading uvloop-0.16.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (4.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 12.3 MB/s eta 0:00:00
+Installing collected packages: uvloop
+Successfully installed uvloop-0.16.0

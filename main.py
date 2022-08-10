@@ -541,16 +541,10 @@ async def api_return_predicts(request:Request):
 @app.get('/save_all_predictions')
 async def save_all_predicts_mdb(request:Request):
     print(fast_api_print(f'{request.client.host} requested to save all model info into the current database'))
-    db_inserting = {
-        "meta_data":{
-            "date_of_model_saving":str(datetime.date.today()),
-            "time_of_model_saving":datetime.datetime.now().strftime("%H:%M:%S"),
-            "user_ip":request.client.host,
-        },
-        "predictions":PREDICTIONS
-    }
-    db.predictions.insert_one(db_inserting)
+    for prediction, index in enumerate(PREDICTIONS):
+        db[f'{datetime.datetime.now().strftime("%H:%M:%S")} ->{index} - {prediction["modo"]}'].insert_many(prediction["valores"])
     return {"message":"All predictions were inserted into the current mongodb database under the collection: predictions."}
+
 
 
     

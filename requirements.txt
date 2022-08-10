@@ -12,7 +12,7 @@ idna==3.3
 ImageHash==4.2.1
 itsdangerous==1.1.0
 Jinja2==2.11.1
-joblib==0.14.1
+joblib>=0.14.1
 kiwisolver==1.4.4
 MarkupSafe==1.1.1
 matplotlib==3.5.2
@@ -22,7 +22,6 @@ networkx==2.8.5
 nltk==3.4.5
 numpy==1.23.1
 packaging==21.3
-pandas-profiling==3.2.0
 pandas==1.4.3
 phik==0.12.2
 Pillow==9.2.0
