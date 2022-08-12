@@ -1,4 +1,6 @@
+from statistics import mode
 import time
+from tkinter.messagebox import NO
 import pandas as pd
 import numpy as np
 from fastapi import FastAPI, Request
@@ -326,9 +328,8 @@ def hyper_parameters_random_forest():
 
 def classify_user(column, column_info, user_id_column):
     model_predictions = {}
-    model_index = 0
     indexes = data[data[column] == column_info].index
-    for model in MODELS:
+    for model_index, model in enumerate(MODELS):
         predictions = model.predict(x.loc[indexes].values)
         predictions_proba = model.predict_proba(x.loc[indexes].values)
         user_ids = data.loc[indexes, user_id_column].to_numpy()
@@ -337,14 +338,11 @@ def classify_user(column, column_info, user_id_column):
         prediction_dataframe['PREDICTIONS'] = predictions
         get_proba = [round(proba[1], 3) for proba in predictions_proba]
         prediction_dataframe['CHURN_PROBABILITY'] = get_proba
-        model_predictions[str(model_index) + " - " + model.__class__.__name__] = prediction_dataframe.to_dict('records')
-        model_index += 1
-    save_predictions({"modo":"column_equals", "valores":model_predictions})
-    return model_predictions
+        save_predictions({"modo":"column_equals", "valores":prediction_dataframe.to_dict("records")}, model=model)
+    return prediction_dataframe.to_dict("records")
 
 
 def classify_all(user_id_column, model_choice_index):
-    model_predictions = {}
     model = MODELS[model_choice_index]
     predictions = model.predict(x)
     predictions_proba = model.predict_proba(x)
@@ -354,13 +352,12 @@ def classify_all(user_id_column, model_choice_index):
     prediction_dataframe['PREDICTIONS'] = predictions
     get_proba = [round(proba[1], 3) for proba in predictions_proba]
     prediction_dataframe['CHURN_PROBABILITY'] = get_proba
-    model_predictions[str(model_choice_index) + " - " + model.__class__.__name__] = prediction_dataframe.to_dict('records')
-    save_predictions({"modo":"all", "valores":prediction_dataframe.to_dict('records')})
-    return model_predictions
+    db[f'{model_choice_index} - {model.__class__.__name__} - ALL - {datetime.datetime.now()}'].insert_many(prediction_dataframe.to_dict('records'))
+    return "since the prediction on ALL users can be really big, it was saved into your MongoDB."
 
 
-def save_predictions(predictions):
-    PREDICTIONS[f'{len(PREDICTIONS)} - {datetime.datetime.now()} - {predictions["modo"]}'] = predictions['valores']
+def save_predictions(predictions, model):
+    PREDICTIONS[f'{len(PREDICTIONS)} - {model.__class__.__name__} - {predictions["modo"]}'] = predictions['valores']
     return 'Prediction saved.'
 
 
@@ -541,8 +538,9 @@ async def api_return_predicts(request:Request):
 @app.get('/save_all_predictions')
 async def save_all_predicts_mdb(request:Request):
     print(fast_api_print(f'{request.client.host} requested to save all model info into the current database'))
-    for prediction, index in enumerate(PREDICTIONS):
-        db[f'{datetime.datetime.now().strftime("%H:%M:%S")} ->{index} - {prediction["modo"]}'].insert_many(prediction["valores"])
+    print(PREDICTIONS)
+    for index, prediction in enumerate(PREDICTIONS):
+        db[f'{prediction} - {datetime.datetime.now()}'].insert_many(PREDICTIONS[prediction]) 
     return {"message":"All predictions were inserted into the current mongodb database under the collection: predictions."}
 
 
@@ -561,3 +559,55 @@ async def save_model_infos(request:Request):
     }
     db.models_info.insert_one(db_inserting)
     return {"message":"All model info was inserted into the current mongodb database under the collection: models_info."}
+
+@app.post("/prediction/specific")
+async def get_prediction_specific(request:Request):
+    request_json = await request.json()
+    user_df = pd.DataFrame(request_json, index=[0])
+    user_df['_id'] = 'lol'
+    new_user_data = data_sanitization(user_df)
+    new_data_with_user = pd.concat([data_sanitized, new_user_data], copy=True)
+    new_data_with_user.reset_index(inplace=True)
+    new_data_with_user.drop(labels=['SITUACAO', 'CLIENTE'], axis=True, inplace=True)
+    new_data_with_dummies = pd.get_dummies(new_data_with_user)
+    dummified_user = new_data_with_dummies.loc[new_data_with_dummies.index[-1]]
+    dummified_user = pd.DataFrame(dummified_user).transpose().drop(labels="index", axis=1)
+    prediction = {}
+    for index, model in enumerate(MODELS):
+        prediction[f'{index} - {model.__class__.__name__}'] = model.predict(dummified_user).tolist()
+
+    return {"prediction":prediction}
+
+@app.get('/predictions/get_probabilities')
+async def api_return_predicts(request:Request):
+    request_json = await request.json()
+    print(fast_api_print(f'{request.client.host} requested to see all predictions'))
+    user_id_column = request_json['user_id_column']
+    model_choice_index = request_json['model_choice_index']
+    offset = request_json['offset']
+    limit = request_json['limit']
+    model = MODELS[model_choice_index]
+    predictions = model.predict(x)
+    predictions_proba = model.predict_proba(x)
+    user_ids = data.loc[data.index, user_id_column]
+    prediction_dataframe = pd.DataFrame()
+    prediction_dataframe['ID'] = user_ids
+    prediction_dataframe['PREDICTIONS'] = predictions
+    get_proba = [round(proba[1], 3) for proba in predictions_proba]
+    prediction_dataframe['CHURN_PROBABILITY'] = get_proba
+    prediction_dataframe['CHANCE_DE_CHURN'] = "baixa"
+    prediction_dataframe['INDEX'] = prediction_dataframe.index
+    BAIXA_CHANCE = np.array(prediction_dataframe['CHURN_PROBABILITY'] < 0.25)
+    prediction_dataframe.loc[BAIXA_CHANCE, 'CHANCE_DE_CHURN'] = "BAIXA"
+    MEDIA_CHANCE = np.array((prediction_dataframe['CHURN_PROBABILITY'] >= 0.25) & (prediction_dataframe['CHURN_PROBABILITY'] < 0.50))
+    prediction_dataframe.loc[MEDIA_CHANCE, 'CHANCE_DE_CHURN'] = "MEDIA"
+    ALTA_CHANCE = np.array((prediction_dataframe['CHURN_PROBABILITY'] >= 0.50) & (prediction_dataframe['CHURN_PROBABILITY'] < 0.75))
+    prediction_dataframe.loc[ALTA_CHANCE, 'CHANCE_DE_CHURN'] = "ALTA"
+    EXTREMA_CHANCE = np.array(prediction_dataframe['CHURN_PROBABILITY'] >= 0.75)
+    prediction_dataframe.loc[EXTREMA_CHANCE, 'CHANCE_DE_CHURN'] = "EXTREMA_CHANCE"
+    prediction_page = prediction_dataframe[prediction_dataframe.index > offset].head(limit)
+    data['CHANCE_DE_CHURN'] = prediction_dataframe['CHANCE_DE_CHURN']
+    return prediction_page.to_dict("records")
+
+
+    
