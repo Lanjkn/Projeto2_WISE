@@ -1,8 +1,6 @@
 Projeto realizado para o programa de Trainee da Wise, ministrado pelos Tutores Rodrigo Quisen, Alberto Levi e Marcos Colodi.
 A finalidade do projeto é analisar minhas habilidades em machine learning e ver o quão bem consigo aplicar o conteúdo ensinado através dos cursos.
 
-(Descrição detalhada #TODO)
-
 Descrição do projeto:
 Após a validação de que o processo de tratamento de dados e geração de modelos de
 classificação, o cliente solicitou a geração de uma API REST que permita o gerenciamento dos
@@ -21,10 +19,10 @@ REQ-01 - Criar um diretório para organizar os arquivos do projeto, contendo:
 ● Um arquivo “requirements.txt” para incluir as dependências do projeto.
 
 REQ-02 - Versionar o diretório do projeto em um repositório privado no Github inserir os tutores
-como colaboradores: quisen; mcolodi; AlbertoLevi. ✔️
+como colaboradores: quisen; mcolodi; AlbertoLevi. ✔
 
 
-REQ-03 - Inserir o dataset fornecido em uma collection chamada “CLIENTES” no banco. ✔️
+REQ-03 - Inserir o dataset fornecido em uma collection chamada “CLIENTES” no banco. 
 
 
 REQ-04 - Implementar uma função para armazenar as previsões de churn realizadas no banco 
@@ -35,7 +33,7 @@ REQ-05 - Implementar uma função para armazenar no banco de dados todas as info
 modelos gerados, bem como as métricas, hiperparâmetros, tempo de duração, datas, etc; 
 
 
-REQ-06 - Criar uma API REST com python utilizando Flask ou FastAPI; ✔️ (?)
+REQ-06 - Criar uma API REST com python utilizando Flask ou FastAPI;
 
 
 REQ-07 - Implementar uma função que possibilite o carregamento de modelos em cache na API; 
